@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const Posts = require("../../models/Posts");
 const Users = require("../../models/Users");
+const postUtils = require("../../utils/Posts");
 
 // @desc Create a new Post
 // @route POST /api/posts/
@@ -43,8 +44,16 @@ const createPost = asyncHandler(async (req, res) => {
 // @route GET /api/posts/
 // @access Private
 const getPosts = asyncHandler(async (req, res) => {
-  const posts = await Posts.find().sort({ createdAt: -1 });
-  res.status(200).json(posts);
+  const posts = await Posts.find({ owner: req.user.id }).sort({
+    createdAt: -1,
+  });
+
+  const formattedPostsPromise = posts.map(async (post) => {
+    return await postUtils.transformPosts(post);
+  });
+
+  const formattedPosts = await Promise.all(formattedPostsPromise);
+  res.status(200).json(formattedPosts);
 });
 
 // @desc Get a Post
@@ -53,7 +62,8 @@ const getPosts = asyncHandler(async (req, res) => {
 const getPostById = asyncHandler(async (req, res) => {
   const post = await Posts.findById(req.params.id);
   if (post) {
-    res.status(200).json(post);
+    const formattedPost = await postUtils.transformPosts(post);
+    res.status(200).json(formattedPost);
   } else {
     res.status(404);
     throw new Error("Post not found");
